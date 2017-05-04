@@ -48,6 +48,7 @@ private:
     * Calculate the total PID error.
     */
     double TotalError();
+    double TotalError(std::vector<double>& p);
 
     /*
     * Check if we have already tuned parameters
@@ -58,6 +59,10 @@ private:
     * Tune parameters
     */
     void twiddle(double threshold, double cte);
+
+    void printErrors();
+    std::vector<double> saveErrors();
+    void restoreErrors(std::vector<double>& err);
 };
 
 #endif /* PID_H */
