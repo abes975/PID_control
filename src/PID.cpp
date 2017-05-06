@@ -36,8 +36,17 @@ void PID::UpdateError(double cte) {
     _i_error += cte;
     _d_error = (cte - _prev_error);
     _prev_error = cte;
-    std::cout << "Finita la update errors " << std::endl;
-    printErrors();
+    // std::cout << "Finita la update errors " << std::endl;
+    // printErrors();
+}
+
+void PID::UpdateError(vector<double> ctes) {
+    for(double cte : ctes) {
+      _p_error = cte;
+      _i_error += cte;
+      _d_error = (cte - _prev_error);
+      _prev_error = cte;
+    }
 }
 
 std::vector<double> PID::saveErrors() {
@@ -45,6 +54,7 @@ std::vector<double> PID::saveErrors() {
   backup.push_back(_p_error);
   backup.push_back(_i_error);
   backup.push_back(_d_error);
+  backup.push_back(_prev_error);
   return backup;
 }
 
@@ -52,18 +62,19 @@ void PID::restoreErrors(std::vector<double>& err) {
   _p_error = err.at(0);
   _i_error = err.at(1);
   _d_error = err.at(2);
+  _prev_error = err.at(3);
 }
 
 
 double PID::TotalError() {
-  return _Kp * _p_error + _Kd * _d_error + _Ki * _i_error;
+  return -_Kp * _p_error -_Ki * _i_error -_Kd * _d_error;
 }
 
 double PID::TotalError(std::vector<double>& p) {
-  return p[0] * _p_error + p[1] * _d_error + p[2] * _i_error;
+  return -p[0] * _p_error -p[1] * _i_error -p[2] * _d_error;
 }
 
-void PID::twiddle(double threshold, double cte) {
+void PID::twiddle(double threshold, vector<double> ctes) {
   vector<double> a;
   double init_sum = 0;
   _dp[0] = 1.0;
@@ -71,16 +82,16 @@ void PID::twiddle(double threshold, double cte) {
   _dp[2] = 1.0;
   double sum = std::accumulate(_dp.begin(), _dp.end(), init_sum);
   a = saveErrors();
-  UpdateError(cte);
-  double best_err = TotalError();
+  UpdateError(ctes);
+  double best_err = TotalError(_p);
   double err;
   while(sum > threshold) {
     for(int i = 0; i < _dp.size(); ++i) {
       _p[i] += _dp[i];
-      cout << " TWIDDLE 1 _p[" << i << "] = " << _p[i] << " _dp[" << i << "] = " << _dp[i] << " CTE = " << cte << std::endl;
+      cout << " TWIDDLE 1 _p[" << i << "] = " << _p[i] << " _dp[" << i << "] = " << _dp[i] << std::endl;
       restoreErrors(a);
-      UpdateError(cte);
-      err = -TotalError(_p);
+      UpdateError(ctes);
+      err = TotalError(_p);
       std::cout << " Sono nella twiddle 1 err = " << err << std::endl;
       if(err < best_err) {
         best_err = err;
@@ -89,8 +100,8 @@ void PID::twiddle(double threshold, double cte) {
         _p[i] -= 2 * _dp[i];
         cout << " TWIDDLE 2 _p[" << i << "] = " << _p[i] << " _dp[" << i << "] = " << _dp[i] << std::endl;
         restoreErrors(a);
-        UpdateError(cte);
-        err = -TotalError(_p);
+        UpdateError(ctes);
+        err = TotalError(_p);
         std::cout << " Sono nella twiddle 2 err " << err << std::endl;
         if(err < best_err) {
           best_err = err;
@@ -103,10 +114,10 @@ void PID::twiddle(double threshold, double cte) {
     }
     sum = std::accumulate(_dp.begin(), _dp.end(), init_sum);
   }
-  std::cout << "XXXXXXXXXXXX finito il tweedle " << " kp " << _p[0] << " kd = " << _p[1] << " ki = " << _p[2] << std::endl;
+  std::cout << "XXXXXXXXXXXX finito il tweedle " << " kp " << _p[0] << " ki = " << _p[1] << " kd = " << _p[2] << std::endl;
   _Kp = _p[0];
-  _Kd = _p[1];
-  _Ki = _p[2];
+  _Ki = _p[1];
+  _Kd = _p[2];
   restoreErrors(a);
   std::cout << "XXXXXXXXXXXXXXXXXXXX FINITA RESTORED ERROR " << std::endl;
   printErrors();

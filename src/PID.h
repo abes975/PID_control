@@ -22,7 +22,10 @@ private:
   double _Ki;
   double _Kp;
   double _Kd;
-
+  void UpdateError(std::vector<double> ctes);
+  double TotalError(std::vector<double>& p);
+  std::vector<double> saveErrors();
+  void restoreErrors(std::vector<double>& err);
   public:
     /*
     * Constructor
@@ -48,7 +51,7 @@ private:
     * Calculate the total PID error.
     */
     double TotalError();
-    double TotalError(std::vector<double>& p);
+
 
     /*
     * Check if we have already tuned parameters
@@ -58,11 +61,10 @@ private:
     /*
     * Tune parameters
     */
-    void twiddle(double threshold, double cte);
+    void twiddle(double threshold, std::vector<double> ctes);
 
     void printErrors();
-    std::vector<double> saveErrors();
-    void restoreErrors(std::vector<double>& err);
+
 };
 
 #endif /* PID_H */
