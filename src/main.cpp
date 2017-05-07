@@ -2,6 +2,7 @@
 #include <iostream>
 #include "json.hpp"
 #include "PID.h"
+#include "PIDTrainer.hpp"
 #include <math.h>
 
 // for convenience
@@ -33,19 +34,17 @@ int main()
   uWS::Hub h;
 
   PID pid;
-//Kp = 0.3, Ki = 0.0005, and Kd = 20.
+  //Kp = 0.3, Ki = 0.0005, and Kd = 20.
   //pid.Init(0.3,0.0005, 20);
   pid.Init(0,0,0);
+  PIDTrainer trainer(pid, 0.2, 2.5);
 
-
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&pid, &trainer](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     if (length && length > 2 && data[0] == '4' && data[1] == '2')
     {
-      std::vector<double> ctes;
-      static int count = 1;
       auto s = hasData(std::string(data));
       if (s != "") {
         auto j = json::parse(s);
@@ -62,13 +61,23 @@ int main()
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
-          if(!(count % 10)) {
-             pid.twiddle(0.2, ctes);
-          } else {
-            ctes.push_back(cte);
-          }
+          if(!pid.isTuned()) {
+            // We are out now...:( need to reset simulator and restart tuning
+            if(trainer.needReset()) {
+                pid.setNewCoefficients(trainer.dumpCoefficient());
+                std::string msg("42[\"reset\", {}]");
+                ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            }
 
+            trainer.TuneParameters(cte);
+            std::vector<double> c;
+            c = trainer.dumpCoefficient();
+            std::cout << " Coefficienti dopo twiddle Kp = " << c.at(0) << " Ki = " << c.at(1) << " Kd = " << c.at(2) << std::endl;
+          }
           pid.UpdateError(cte);
+          pid.setNewCoefficients(trainer.dumpCoefficient());
+
+
           steer_value = pid.TotalError();
           std::cout << "Steering value = " << steer_value << std::endl;
           if (steer_value > 1) {
@@ -79,17 +88,18 @@ int main()
             std::cout << "CORRETTO ANGOLO a -1 " << std::endl;
             steer_value = -1;
           }
-          count++;
+
 
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          if (speed < 10 || abs(steer_value) < 0.2)
+          if (speed < 15) {
             msgJson["throttle"] = 0.3;
-          else
+          } else {
             msgJson["throttle"] = -0.1;
+          }
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);

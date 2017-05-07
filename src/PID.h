@@ -12,8 +12,6 @@ private:
   double _d_error;
   double _prev_error;
   double _sum_error;
-  std::vector<double> _dp;
-  std::vector<double> _p;
   bool _isTuned;
 
   /*
@@ -22,10 +20,6 @@ private:
   double _Ki;
   double _Kp;
   double _Kd;
-  void UpdateError(std::vector<double> ctes);
-  double TotalError(std::vector<double>& p);
-  std::vector<double> saveErrors();
-  void restoreErrors(std::vector<double>& err);
   public:
     /*
     * Constructor
@@ -52,19 +46,21 @@ private:
     */
     double TotalError();
 
-
     /*
     * Check if we have already tuned parameters
     */
     bool isTuned() const;
 
     /*
-    * Tune parameters
+    * Method to access the coefficients
     */
-    void twiddle(double threshold, std::vector<double> ctes);
-
-    void printErrors();
-
+    double getKp() const { return _Kp; }
+    double getKi() const { return _Ki; }
+    double getKd() const { return _Kd; }
+    /*
+    * Set coefficient after tuning
+    */
+    void setNewCoefficients(const std::vector<double>& coeff);
 };
 
 #endif /* PID_H */
