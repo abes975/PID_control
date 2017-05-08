@@ -17,7 +17,8 @@ PIDTrainer::PIDTrainer(PID& p, double threshold, double resetTreshold)
 
 void PIDTrainer::incError(double error)
 {
-  _totalError = error * error;
+  _proc_samples++;
+  _totalError += error * error;
 }
 
 

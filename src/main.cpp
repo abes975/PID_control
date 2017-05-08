@@ -63,6 +63,7 @@ int main()
           * another PID controller to control the speed!
           */
           if(!pid.isTuned()) {
+            trainer.incError(cte);
             std::cout << "Sono in tuning " << std::endl;
             // We are out now...:( need to reset simulator and restart tunin
             trainer.twiddle(cte, 10*i);

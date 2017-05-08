@@ -25,6 +25,7 @@ class PIDTrainer {
     const std::vector<double>& dumpCoefficient() const;
     bool needReset() const;
     PIDTrainer::state getState() const;
+    void incError(double error);
   private:
     std::vector<double> _samples;
     std::vector<double> _dp;
