@@ -45,6 +45,7 @@ int main()
     // The 2 signifies a websocket event
     if (length && length > 2 && data[0] == '4' && data[1] == '2')
     {
+      static int i = 1;
       auto s = hasData(std::string(data));
       if (s != "") {
         auto j = json::parse(s);
@@ -62,22 +63,27 @@ int main()
           * another PID controller to control the speed!
           */
           if(!pid.isTuned()) {
-            // We are out now...:( need to reset simulator and restart tuning
-            if(trainer.needReset()) {
-                pid.setNewCoefficients(trainer.dumpCoefficient());
-                std::string msg("42[\"reset\", {}]");
-                ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-            }
-
-            trainer.TuneParameters(cte);
+            std::cout << "Sono in tuning " << std::endl;
+            // We are out now...:( need to reset simulator and restart tunin
+            trainer.twiddle(cte, 10*i);
             std::vector<double> c;
             c = trainer.dumpCoefficient();
             std::cout << " Coefficienti dopo twiddle Kp = " << c.at(0) << " Ki = " << c.at(1) << " Kd = " << c.at(2) << std::endl;
+
+            if(trainer.needReset() || abs(cte) > 2.5 ) {
+              std::cout << "Reset here " << std::endl;
+              //pid.setNewCoefficients(trainer.dumpCoefficient());
+              std::string msg("42[\"reset\", {}]");
+              ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            }
           }
+          if(trainer.getState() == PIDTrainer::state::TRAINING_COMPLETE) {
+              pid.setNewCoefficients(trainer.dumpCoefficient());
+              pid.setTuned(true);
+              i++;
+          }
+
           pid.UpdateError(cte);
-          pid.setNewCoefficients(trainer.dumpCoefficient());
-
-
           steer_value = pid.TotalError();
           std::cout << "Steering value = " << steer_value << std::endl;
           if (steer_value > 1) {

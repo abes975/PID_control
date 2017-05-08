@@ -61,6 +61,7 @@ private:
     * Set coefficient after tuning
     */
     void setNewCoefficients(const std::vector<double>& coeff);
+    void setTuned(bool);
 };
 
 #endif /* PID_H */

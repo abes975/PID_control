@@ -13,15 +13,15 @@ class PIDTrainer {
       _needReset(false) {};
     PIDTrainer(PID& p, double threshold, double resetTreshold);
     enum state { INIT,
-                 PARAMS_UP,
-                 PARAMS_DOWN,
                  COMPUTE_BEST_ERROR,
+                 CHECK_FINISHED,
                  EVALUATE_ERROR,
                  NEED_MORE_SAMPLES,
+                 NEED_MORE_SAMPLES_2,
                  TRAINING_COMPLETE };
     void TuneParameters(double cte);
     void saveSamples(double sample);
-    void twiddle(double cte);
+    void twiddle(double cte, int sample_limit);
     const std::vector<double>& dumpCoefficient() const;
     bool needReset() const;
     PIDTrainer::state getState() const;
@@ -32,10 +32,12 @@ class PIDTrainer {
     double _threshold;
     double _resetTreshold;
     bool _needReset;
+    int _next_index;
+    int _proc_samples;
     PIDTrainer::state _currState;
     PID _pid;
-    int _processed_samples;
     double _best_error;
+    double _error;
     void UpdateErrors(PID &p);
 };
 

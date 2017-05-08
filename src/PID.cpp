@@ -36,7 +36,9 @@ void PID::UpdateError(double cte)
 
 double PID::TotalError()
 {
-  double error = -_Kp * _p_error -_Ki * _i_error -_Kd * _d_error;
+  double error = FLT_MAX;
+  if (_Kp || _Ki || _Kd)
+    error = -_Kp * _p_error -_Ki * _i_error -_Kd * _d_error;
   // if (error > 1.0) {
   //   _Ki -= error - 1.0;
   //   error = 1.0;
@@ -51,6 +53,11 @@ double PID::TotalError()
 bool PID::isTuned(void) const
 {
   return _isTuned;
+}
+
+void PID::setTuned(bool tuned)
+{
+  _isTuned = tuned;
 }
 
 void PID::setNewCoefficients(const std::vector<double>& coeff)
