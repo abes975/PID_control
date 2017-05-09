@@ -7,39 +7,32 @@
 
 class PIDTrainer {
   public:
-    PIDTrainer(double threshold): _dp(3,1.0), _p(3,0.0), _threshold(threshold),
-      _resetTreshold(2.5), _needReset(false) {};
-    PIDTrainer() : _dp(3,1.0), _p(3,0.0), _threshold(0.2), _resetTreshold(2.5),
-      _needReset(false) {};
+    PIDTrainer(double threshold): _dp(3,1.0), _p(3,0.0), _threshold(threshold) {};
+    PIDTrainer() : _dp(3,1.0), _p(3,0.0), _threshold(0.2) {};
     PIDTrainer(PID& p, double threshold, double resetTreshold);
     enum state { INIT,
-                 COMPUTE_BEST_ERROR,
-                 CHECK_FINISHED,
-                 EVALUATE_ERROR,
-                 NEED_MORE_SAMPLES,
-                 NEED_MORE_SAMPLES_2,
+                 INCREASE_COEFFICIENT,
+                 EVALUATE_ERROR_AFTER_INCREASE,
+                 EVALUATE_ERROR_AFTER_DECREASE,
                  TRAINING_COMPLETE };
-    void TuneParameters(double cte);
-    void saveSamples(double sample);
-    void twiddle(double cte, int sample_limit);
+    void TuneParameters();
+    void UpdateError(double cte);
     const std::vector<double>& dumpCoefficient() const;
-    bool needReset() const;
     PIDTrainer::state getState() const;
-    void incError(double error);
+    double increment_step;
+    double decrement_step;
   private:
-    std::vector<double> _samples;
     std::vector<double> _dp;
     std::vector<double> _p;
+    std::vector<double> _best_param;
     double _threshold;
-    double _resetTreshold;
-    bool _needReset;
     int _next_index;
-    int _proc_samples;
+    int _samples;
     PIDTrainer::state _currState;
     PID _pid;
     double _best_error;
-    double _error;
-    void UpdateErrors(PID &p);
+    double _total_error;
+    double CurrentError();
 };
 
 
