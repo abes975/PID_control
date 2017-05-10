@@ -80,16 +80,23 @@ int main()
             //std::cout << "My robot is running in tuning " << i << " samples processed " << std::endl;
             // Even if we reset the simulator some message still arrive..
             // I would like to filter them.
-            if(abs(cte) <= 1) {
+            if(abs(cte) <= 1.2) {
               trainer.UpdateError(cte);
               i++;
             }
             // We are out now...:( need to reset simulator and restart tunin
-            if((abs(cte) > 1) && (i >= 50)) {
+            if((abs(cte) > 1.2) || (i == 100)) {
                 trainer.TuneParameters();
                 std::string msg("42[\"reset\", {}]");
                 ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 i = 1;
+            }
+          } else {
+            if(abs(cte) >= 1.2) {
+              std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX Start tuning again" << std::endl;
+              pid.setTuned(false);
+              std::string msg("42[\"reset\", {}]");
+              ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
             }
           }
 
@@ -99,7 +106,7 @@ int main()
           json msgJson;
           msgJson["steering_angle"] = steer_value;
           //if (abs(steer_value) < 0.3 || speed <= 2) {
-            msgJson["throttle"] = 0.3;
+            msgJson["throttle"] = 0.7;
           //} else {
           //  msgJson["throttle"] = -0.1;
           //}

@@ -147,20 +147,20 @@ void PIDTrainer::TuneParameters()
       _currState = INCREASE_COEFFICIENT;
       break;
     case TRAINING_COMPLETE:
-      std::cout << "TRAINING COMPLETE we did it " << _total_train << std::endl;
+      std::cout << "TRAINING COMPLETE we did it " << _total_train << "PArams " <<
+        _param[0] << " " << _param[1] << " " << _param[2] << std::endl;
       _total_train++;
       _best_param = _param;
       _pid->Init(_param[0], _param[1], _param[2]);
+      _pid->setTuned(true);
       _currState = TRAINING_INIT;
       break;
     default:
       std::cout << "unknown state " << std::endl;
   }
 
-    std::cout << "Before resetting total error " << _total_error << " and samples " << _samples << std::endl;
-    _total_error = 0;
-    _samples = 1;
-    std::cout << "Resetting total error " << _total_error << " and samples " << _samples << std::endl;
+  _total_error = 0;
+  _samples = 1;
 }
 
 
