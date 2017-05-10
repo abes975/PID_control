@@ -37,13 +37,13 @@ int main()
   //Kp = 0.3, Ki = 0.0005, and Kd = 20.
   //pid.Init(0.3,0.0005, 20);
   pid.Init(0,0,0);
-  PIDTrainer trainer(pid, 0.2, 2.5);
-  trainer.TuneParameters();
+  PIDTrainer trainer(&pid, 0.05, 10);
 
   h.onMessage([&pid, &trainer](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
+    static int i = 1;
     if (length && length > 2 && data[0] == '4' && data[1] == '2')
     {
       auto s = hasData(std::string(data));
@@ -62,45 +62,52 @@ int main()
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
+          // std::cout << " PID current coefficient Kp " << pid.getKp() << " Ki " <<
+          //   pid.getKi() << " kd " << pid.getKd() << " current cte " << cte << std::endl;
           pid.UpdateError(cte);
           steer_value = pid.TotalError();
-          std::cout << "Steering value = " << steer_value << std::endl;
+          //std::cout << "Steering value = " << steer_value << std::endl;
           if (steer_value > 1) {
-            std::cout << "CORRETTO ANGOLO a 1 " << std::endl;
+            //std::cout << "CORRETTO ANGOLO a 1 " << std::endl;
             steer_value = 1;
           }
           if (steer_value < -1) {
-            std::cout << "CORRETTO ANGOLO a -1 " << std::endl;
+            //std::cout << "CORRETTO ANGOLO a -1 " << std::endl;
             steer_value = -1;
           }
 
           if(!pid.isTuned()) {
-            trainer.UpdateError(cte);
-            std::cout << "Sono in tuning " << std::endl;
+            //std::cout << "My robot is running in tuning " << i << " samples processed " << std::endl;
+            // Even if we reset the simulator some message still arrive..
+            // I would like to filter them.
+            if(abs(cte) <= 1) {
+              trainer.UpdateError(cte);
+              i++;
+            }
             // We are out now...:( need to reset simulator and restart tunin
-            if(abs(cte) > 2.5) {
+            if((abs(cte) > 1) && (i >= 50)) {
                 trainer.TuneParameters();
-                //trainer.Twiddle();
-                std::cout << "Reset here " << std::endl;
-                //pid.setNewCoefficients(trainer.dumpCoefficient());
                 std::string msg("42[\"reset\", {}]");
                 ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                i = 1;
             }
           }
 
-
-
-
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          //std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          if (speed < 15) {
+          //if (abs(steer_value) < 0.3 || speed <= 2) {
             msgJson["throttle"] = 0.3;
-          } else {
-            msgJson["throttle"] = -0.1;
+          //} else {
+          //  msgJson["throttle"] = -0.1;
+          //}
+          if (speed <= 0.1) {
+            std::string msg("42[\"reset\", {}]");
+            ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           }
+
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
