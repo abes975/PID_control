@@ -36,9 +36,7 @@ void PID::UpdateError(double cte)
 
 double PID::TotalError()
 {
-  double error = FLT_MAX;
-  if (_Kp || _Ki || _Kd)
-    error = -_Kp * _p_error -_Ki * _i_error -_Kd * _d_error;
+  double error = -_Kp * _p_error -_Ki * _i_error -_Kd * _d_error;
   // if (error > 1.0) {
   //   _Ki -= error - 1.0;
   //   error = 1.0;

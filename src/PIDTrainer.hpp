@@ -7,15 +7,17 @@
 
 class PIDTrainer {
   public:
-    PIDTrainer(double threshold): _dp(3,1.0), _p(3,0.0), _threshold(threshold) {};
-    PIDTrainer() : _dp(3,1.0), _p(3,0.0), _threshold(0.2) {};
+    PIDTrainer(double threshold): _dp(3,1.0), _param(3,0.0), _threshold(threshold) {};
+    PIDTrainer() : _dp(3,1.0), _param(3,0.0), _threshold(0.2) {};
     PIDTrainer(PID& p, double threshold, double resetTreshold);
-    enum state { INIT,
+    enum state { TRAINING_INIT,
+                 INIT,
                  INCREASE_COEFFICIENT,
                  EVALUATE_ERROR_AFTER_INCREASE,
                  EVALUATE_ERROR_AFTER_DECREASE,
                  TRAINING_COMPLETE };
     void TuneParameters();
+    void Twiddle();
     void UpdateError(double cte);
     const std::vector<double>& dumpCoefficient() const;
     PIDTrainer::state getState() const;
@@ -23,7 +25,7 @@ class PIDTrainer {
     double decrement_step;
   private:
     std::vector<double> _dp;
-    std::vector<double> _p;
+    std::vector<double> _param;
     std::vector<double> _best_param;
     double _threshold;
     int _next_index;
