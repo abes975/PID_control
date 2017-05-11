@@ -12,12 +12,13 @@ PIDTrainer::PIDTrainer(PID* p, double threshold, double resetTreshold)
   _samples = 1;
   _param = std::vector<double>(3,0.0);
   _best_param = std::vector<double>(3,0.0);
-  _dp = std::vector<double>(3, 0.3);
-  increment_step = 1.4;
-  decrement_step = 0.6;
+  _dp = std::vector<double>(3, 0.1);
+  increment_step = 1.1;
+  decrement_step = 0.9;
   _best_error = -1;
   _total_train = 1;
   _total_error = FLT_MAX;
+ _best_error = FLT_MAX;
 }
 
 

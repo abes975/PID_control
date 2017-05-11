@@ -4,6 +4,8 @@
 #include "PID.h"
 #include "PIDTrainer.hpp"
 #include <math.h>
+#include <cfloat>
+
 
 // for convenience
 using json = nlohmann::json;
@@ -34,16 +36,20 @@ int main()
   uWS::Hub h;
 
   PID pid;
+  PID speedPid;
   //Kp = 0.3, Ki = 0.0005, and Kd = 20.
   //pid.Init(0.3,0.0005, 20);
   pid.Init(0,0,0);
   PIDTrainer trainer(&pid, 0.05, 10);
+  speedPid.Init(0,0,0);
+  PIDTrainer speedTrainer(&speedPid, 0.1, 30);
 
-  h.onMessage([&pid, &trainer](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&pid, &trainer,&speedPid, &speedTrainer](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     static int i = 1;
+    static int prev = 1;
     if (length && length > 2 && data[0] == '4' && data[1] == '2')
     {
       auto s = hasData(std::string(data));
@@ -56,6 +62,7 @@ int main()
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
           double steer_value;
+          double throttle_val;
           /*
           * TODO: Calcuate steering value here, remember the steering value is
           * [-1, 1].
@@ -66,6 +73,8 @@ int main()
           //   pid.getKi() << " kd " << pid.getKd() << " current cte " << cte << std::endl;
           pid.UpdateError(cte);
           steer_value = pid.TotalError();
+          //speedPid.UpdateError(cte);
+          //throttle_val = speedPid.TotalError();
           //std::cout << "Steering value = " << steer_value << std::endl;
           if (steer_value > 1) {
             //std::cout << "CORRETTO ANGOLO a 1 " << std::endl;
@@ -76,23 +85,36 @@ int main()
             steer_value = -1;
           }
 
+          //if(!pid.isTuned() || !speedPid.isTuned()) {
           if(!pid.isTuned()) {
             //std::cout << "My robot is running in tuning " << i << " samples processed " << std::endl;
             // Even if we reset the simulator some message still arrive..
             // I would like to filter them.
-            if(abs(cte) <= 1.2) {
+
+            //if(abs(cte) <= trainer.GetBestError()) {
               trainer.UpdateError(cte);
+              //speedTrainer.UpdateError(cte);
               i++;
-            }
+            //}
+            // if (i > 1500) {
+            //     std::cout << "We finished a loop (probably)" << std::endl;
+            //     std::vector<double> best_coeff = trainer.dumpCoefficient();
+            //     std::cout << "Here's the parameter kp " << best_coeff[0] << " Ki " << best_coeff[1] << " kd " << best_coeff[2] << std::endl;
+            //     pid.setTuned(true);
+            //     i = 0;
+            // }
             // We are out now...:( need to reset simulator and restart tunin
-            if((abs(cte) > 1.2) || (i == 100)) {
+
+            //if(abs(cte) > 0.8) {
+            //    prev = i;
                 trainer.TuneParameters();
-                std::string msg("42[\"reset\", {}]");
-                ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                //speedTrainer.TuneParameters();
+                //std::string msg("42[\"reset\", {}]");
+                //ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 i = 1;
-            }
+            //}
           } else {
-            if(abs(cte) >= 1.2) {
+            if(abs(cte) >=  0.8) {
               std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX Start tuning again" << std::endl;
               pid.setTuned(false);
               std::string msg("42[\"reset\", {}]");
@@ -105,12 +127,14 @@ int main()
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          //if (abs(steer_value) < 0.3 || speed <= 2) {
-            msgJson["throttle"] = 0.7;
-          //} else {
-          //  msgJson["throttle"] = -0.1;
-          //}
-          if (speed <= 0.1) {
+          if (speed <= 20) {
+            msgJson["throttle"] = 0.3;
+          } else {
+            msgJson["throttle"] = -0.1;
+          }
+
+          // We got suck somewhere...:(
+          if (speed <= 0.1 || abs(cte) > 1.5) {
             std::string msg("42[\"reset\", {}]");
             ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           }

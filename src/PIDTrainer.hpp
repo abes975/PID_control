@@ -21,6 +21,7 @@ class PIDTrainer {
     void UpdateError(double cte);
     const std::vector<double>& dumpCoefficient() const;
     PIDTrainer::state getState() const;
+    double GetBestError() const { return _best_error; }
     double increment_step;
     double decrement_step;
   private:
