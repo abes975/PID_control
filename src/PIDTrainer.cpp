@@ -12,9 +12,9 @@ PIDTrainer::PIDTrainer(PID* p, double threshold, double resetTreshold)
   _samples = 1;
   _param = std::vector<double>(3,0.0);
   _best_param = std::vector<double>(3,0.0);
-  _dp = std::vector<double>(3, 0.3);
-  increment_step = 1.4;
-  decrement_step = 0.6;
+  _dp = std::vector<double>(3, 0.23);
+  increment_step = 1.1;
+  decrement_step = 0.9;
   _best_error = -1;
   _total_train = 1;
   _total_error = FLT_MAX;
@@ -77,7 +77,7 @@ void PIDTrainer::TuneParameters()
         std::cout << "TRAINING INIT" << std::endl;
         _best_error = error;
         std::cout << "\tGet the 1st TIME best error " << _best_error << std::endl;
-        _dp = std::vector<double>(3, 0.2);
+        _dp = std::vector<double>(3, 0.23);
         //_param = std::vector<double>(3, 0.0);
         // _param[0] = _pid->getKp();
         // _param[1] = _pid->getKi();
@@ -147,7 +147,7 @@ void PIDTrainer::TuneParameters()
       _currState = INCREASE_COEFFICIENT;
       break;
     case TRAINING_COMPLETE:
-      std::cout << "TRAINING COMPLETE we did it " << _total_train << "PArams " <<
+      std::cout << "TRAINING COMPLETE we did it " << _total_train << " Params " <<
         _param[0] << " " << _param[1] << " " << _param[2] << std::endl;
       _total_train++;
       _best_param = _param;

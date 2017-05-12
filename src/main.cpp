@@ -37,7 +37,7 @@ int main()
   //Kp = 0.3, Ki = 0.0005, and Kd = 20.
   //pid.Init(0.3,0.0005, 20);
   pid.Init(0,0,0);
-  PIDTrainer trainer(&pid, 0.05, 10);
+  PIDTrainer trainer(&pid, 0.005, 10);
 
   h.onMessage([&pid, &trainer](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -85,14 +85,14 @@ int main()
               i++;
             }
             // We are out now...:( need to reset simulator and restart tunin
-            if((abs(cte) > 1.2) || (i == 100)) {
+            if((abs(cte) > 1.2) || (i == 200)) {
                 trainer.TuneParameters();
+                i = 1;
                 std::string msg("42[\"reset\", {}]");
                 ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-                i = 1;
             }
           } else {
-            if(abs(cte) >= 1.2) {
+            if(abs(cte) >= 2.5) {
               std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX Start tuning again" << std::endl;
               pid.setTuned(false);
               std::string msg("42[\"reset\", {}]");
@@ -106,7 +106,7 @@ int main()
           json msgJson;
           msgJson["steering_angle"] = steer_value;
           //if (abs(steer_value) < 0.3 || speed <= 2) {
-            msgJson["throttle"] = 0.7;
+            msgJson["throttle"] = 0.75;
           //} else {
           //  msgJson["throttle"] = -0.1;
           //}
