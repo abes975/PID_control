@@ -22,8 +22,10 @@ class PIDTrainer {
     const std::vector<double>& dumpCoefficient() const;
     PIDTrainer::state getState() const;
     double GetBestError() const { return _best_error; }
-    double increment_step;
-    double decrement_step;
+    //double increment_step;
+    //double decrement_step;
+    std::vector<double> increment_step;
+    std::vector<double> decrement_step;
   private:
     std::vector<double> _dp;
     std::vector<double> _param;
