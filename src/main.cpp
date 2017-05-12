@@ -61,8 +61,14 @@ int main()
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
+
+          double tr = std::stod(j[1]["throttle"].get<std::string>());
           double steer_value;
           double throttle_val;
+          if(!angle && !tr)
+            std::cout << " Primo campione cte = " << cte << std::endl;
+          else
+            std::cout << " NON PRIMO CAMPIONE = " << angle << " " << tr << " " << cte << std::endl;
           /*
           * TODO: Calcuate steering value here, remember the steering value is
           * [-1, 1].
@@ -135,6 +141,7 @@ int main()
 
           // We got suck somewhere...:(
           if (speed <= 0.1 || abs(cte) > 1.5) {
+            std::cout << " XXXXX RESET " << std::endl;
             std::string msg("42[\"reset\", {}]");
             ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           }

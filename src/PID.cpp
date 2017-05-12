@@ -29,9 +29,16 @@ void PID::Init(double Kp, double Ki, double Kd)
 void PID::UpdateError(double cte)
 {
     _p_error = cte;
-    _i_error += cte;
     _d_error = (cte - _prev_error);
     _prev_error = cte;
+    _i_error += cte;
+    // Anti-windup
+    //double i_term_max = 0.2;
+    //if (Ki_*i_error_ > i_term_max) {
+    //  i_error_ = i_term_max / Ki_;
+    //} else if (Ki_*i_error_ < -i_term_max) {
+    //  i_error_ = -i_term_max / Ki_;
+    //}
 }
 
 double PID::TotalError()
