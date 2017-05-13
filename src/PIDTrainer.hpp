@@ -9,7 +9,7 @@ class PIDTrainer {
   public:
     PIDTrainer(double threshold): _dp(3,1.0), _param(3,0.0), _threshold(threshold) {};
     PIDTrainer() : _dp(3,1.0), _param(3,0.0), _threshold(0.2) {};
-    PIDTrainer(PID* p, double threshold, double resetTreshold);
+    PIDTrainer(PID* p, double threshold);
     enum state { TRAINING_INIT,
                  INIT,
                  INCREASE_COEFFICIENT,
@@ -21,7 +21,7 @@ class PIDTrainer {
     void UpdateError(double cte);
     const std::vector<double>& dumpCoefficient() const;
     PIDTrainer::state getState() const;
-    double GetBestError() const { return _best_error; }
+    double getBestError() const { return _best_error; }
     //double increment_step;
     //double decrement_step;
     std::vector<double> increment_step;
@@ -37,8 +37,9 @@ class PIDTrainer {
     PID* _pid;
     double _best_error;
     double _total_error;
-    double CurrentError();
     int _total_train;
+    int _number_of_calls;
+    double CurrentError();
 };
 
 

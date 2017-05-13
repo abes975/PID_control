@@ -36,24 +36,28 @@ int main()
   uWS::Hub h;
   // Annoying stuff...even if the simulator is resetted socket is not flushed
   // So other samples could arrive...and we have to wait to re start tuning
-  bool resetComleted = true;
+  bool resetCompleted = true;
 
   PID pid;
   PID speedPid;
-  //Kp = 0.3, Ki = 0.0005, and Kd = 20.
-  //pid.Init(0.3,0.0005, 20);
 
+  //pid.Init(0.25,0.0,1.3);
   pid.Init(0,0,0);
-  PIDTrainer trainer(&pid, 0.2, 10);
-  speedPid.Init(0,0,0);
-  PIDTrainer speedTrainer(&speedPid, 0.2, 30);
 
-  h.onMessage([&pid, &trainer,& resetComleted, &speedPid, &speedTrainer]
+  PIDTrainer trainer(&pid, 0.4);
+  pid.setTuned(true);
+
+  speedPid.Init(0,0,0);
+  PIDTrainer speedTrainer(&speedPid, 0.4);
+
+  h.onMessage([&pid, &trainer,&resetCompleted, &speedPid, &speedTrainer]
       (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // how many sample we use to tune parameter (how_many * scaling_factor)
-    int max_drift = 2.5;
-    int how_many = 500;
-    static int scaling_factor = 1;
+    int target_speed = 40;
+    int max_drift = 3;
+    int min_samples = 20;
+    int how_many = 200;
+    static double scaling_factor = 1;
     static int samples = 1;
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -76,26 +80,38 @@ int main()
           double throttle_val;
           // Even after a reset has been issued some spurious sample (already
           // in the socket buffer might arrive..and we do not like them)
-          if(!angle && !trottle && !resetComleted) {
-            resetComleted = true;
+          if(!angle && !trottle && !resetCompleted) {
+            resetCompleted = true;
             std::cout << " Primo campione cte = " << cte << std::endl;
           }
 
-          if(!pid.isTuned() && resetComleted) {
+          // Run Twiddle
+          if(!pid.isTuned() && resetCompleted) {
             trainer.UpdateError(cte);
             samples++;
-            if(samples == how_many * scaling_factor) {
-              std::cout << " We got " << samples << " samples " << std::endl;
+
+            int total = int(how_many * scaling_factor);
+            if(samples == total) {
+              // std::cout << " We got " << samples << " samples " << std::endl;
+              // if(trainer.getBestError() <= 0.2) {
+              //   scaling_factor *= 1.5;
+              //   std::cout << " We want more samples here " << int(how_many * scaling_factor) << std::endl;
+              // }
               trainer.TuneParameters();
+              std::cout << "TUNING PHASE: PID current coefficient Kp " << pid.getKp()
+                 << " Kd " << pid.getKd() << " Ki " << pid.getKi() << " current cte "
+                 << cte << std::endl;
               std::string msg("42[\"reset\", {}]");
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-              resetComleted = false;
+              resetCompleted = false;
               samples = 1;
             }
           }
-          if(pid.isTuned()) {
-            std::cout << "we are running with Kp = " << pid.getKp() << "Kd = " <<
+
+          if(resetCompleted && pid.isTuned()) {
+            std::cout << "we are running with Kp = " << pid.getKp() << " Kd = " <<
               pid.getKd() << " Ki = " << pid.getKi()<< std::endl;
+            //samples++;
           }
           // else {
           //   std::cout << "TUNING PHASE: PID current coefficient Kp " << pid.getKp()
@@ -103,23 +119,27 @@ int main()
           //   << cte << std::endl;
           // }
 
-          pid.UpdateError(cte);
-          steer_value = pid.TotalError();
+          if(resetCompleted) {
+            pid.UpdateError(cte);
+            steer_value = pid.TotalError();
+
 
           //speedPid.UpdateError(cte);
           //throttle_val = speedPid.TotalError();
           //std::cout << "Steering value = " << steer_value << std::endl;
-
-          if (steer_value > 1) {
-            steer_value = 1;
+            if (steer_value > 1) {
+              steer_value = 1;
+            }
+            if (steer_value < -1) {
+              steer_value = -1;
+            }
           }
-          if (steer_value < -1) {
-            steer_value = -1;
-          }
-
-          if(resetComleted && samples >= how_many * scaling_factor && fabs(cte) > max_drift) {
-              std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX Start tuning again" << std::endl;
+          // Do we need to go back to tuning mode?
+          if(resetCompleted && pid.isTuned() && fabs(cte) > 2 * max_drift) {
+              std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX WE DID NOT DO A GOOD JOB: reset = " << resetCompleted <<  " fabs(cte) = " << fabs(cte) << " Start tuning again" << std::endl;
               pid.setTuned(false);
+              resetCompleted = false;
+              samples = 1;
               std::string msg("42[\"reset\", {}]");
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           }
@@ -130,15 +150,27 @@ int main()
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          if (speed <= 20) {
-            msgJson["throttle"] = 0.3;
+          if (speed <= 30) {
+              msgJson["throttle"] = 1.0;
           } else {
             msgJson["throttle"] = -0.1;
           }
 
           // We got suck somewhere...:(
-          if (resetComleted && samples > (how_many*scaling_factor) && (speed <= 0.1 || fabs(cte) > 1.5)) {
-            std::cout << " XXXXX RESET BECAUSE STUCK" << std::endl;
+          //std::cout << "ResetCompleted " << resetCompleted << " samples = " << samples << " min samples " << min_samples
+          //<< " speed = " << speed << " fabs(cte) " << fabs(cte) << std::endl;
+          if ((resetCompleted && (samples > (min_samples))) && (speed <= 0.1 || fabs(cte) >= max_drift)) {
+            std::cout << " XXXXX RESET BECAUSE STUCK after " << samples << "cte = " << fabs(cte) << std::endl;
+            // The car crahed after few samples...so..set a big error in order
+            // to make twiddle to do a step back :)
+            // This is an artifacts to penalize the facte we get off the road
+            // before we got all the samples...
+            // for(int i = samples; i < (how_many * scaling_factor); i++)
+            //   trainer.UpdateError(cte);
+            // samples = (how_many * scaling_factor) - 1;
+            //trainer.TuneParameters();
+            resetCompleted = false;
+            samples = 1;
             std::string msg("42[\"reset\", {}]");
             ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           }
