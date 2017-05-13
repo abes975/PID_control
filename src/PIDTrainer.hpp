@@ -9,7 +9,7 @@ class PIDTrainer {
   public:
     PIDTrainer(double threshold): _dp(3,1.0), _param(3,0.0), _threshold(threshold) {};
     PIDTrainer() : _dp(3,1.0), _param(3,0.0), _threshold(0.2) {};
-    PIDTrainer(PID* p, double threshold, double resetTreshold);
+    PIDTrainer(PID* p, double threshold);
     enum state { TRAINING_INIT,
                  INIT,
                  INCREASE_COEFFICIENT,

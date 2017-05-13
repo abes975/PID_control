@@ -33,25 +33,18 @@ void PID::UpdateError(double cte)
     _prev_error = cte;
     _i_error += cte;
     // Anti-windup
-    //double i_term_max = 0.2;
-    //if (Ki_*i_error_ > i_term_max) {
-    //  i_error_ = i_term_max / Ki_;
-    //} else if (Ki_*i_error_ < -i_term_max) {
-    //  i_error_ = -i_term_max / Ki_;
-    //}
+    // double i_term_max = 1.0;
+    // double i_term_min = -1.0;
+    // if ((_Ki * _i_error) > i_term_max)
+    //  _i_error = i_term_max / _Ki;
+    // else if ((_Ki * _i_error) < i_term_min)
+    //  _i_error = i_term_min / _Ki;
+
 }
 
 double PID::TotalError()
 {
   double error = -_Kp * _p_error -_Ki * _i_error -_Kd * _d_error;
-
-  // if (error > 1.0) {
-  //   _Ki -= error - 1.0;
-  //   error = 1.0;
-  // } else if (error < -1.0) {
-  //   _Ki += -1.0 - error;
-  //   error = -1.0;
-  // }
   return error;
 
 }

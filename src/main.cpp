@@ -5,6 +5,7 @@
 #include "PIDTrainer.hpp"
 #include <math.h>
 #include <cfloat>
+#include <limits>
 
 
 // for convenience
@@ -36,22 +37,18 @@ int main()
   uWS::Hub h;
   // Annoying stuff...even if the simulator is resetted socket is not flushed
   // So other samples could arrive...and we have to wait to re start tuning
-  bool resetComleted = true;
-
+  bool resetCompleted = true;
+  double prev_best_error = FLT_MAX;
   PID pid;
-  PID speedPid;
-  //Kp = 0.3, Ki = 0.0005, and Kd = 20.
-  //pid.Init(0.3,0.0005, 20);
+  //Kp = 0.5 Kd = 7.75 Ki = 0.000244141 with constant throttle 0.3
+  //pid.Init(0.5,0.000244141, 7.75);
 
   pid.Init(0,0,0);
-  PIDTrainer trainer(&pid, 0.2, 10);
-  speedPid.Init(0,0,0);
-  PIDTrainer speedTrainer(&speedPid, 0.2, 30);
+  PIDTrainer trainer(&pid, 0.2);
 
-  h.onMessage([&pid, &trainer,& resetComleted, &speedPid, &speedTrainer]
-      (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&pid, &trainer,&resetCompleted, &prev_best_error](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // how many sample we use to tune parameter (how_many * scaling_factor)
-    int max_drift = 2.5;
+    int max_drift = 2.7;
     int how_many = 500;
     static int scaling_factor = 1;
     static int samples = 1;
@@ -76,76 +73,81 @@ int main()
           double throttle_val;
           // Even after a reset has been issued some spurious sample (already
           // in the socket buffer might arrive..and we do not like them)
-          if(!angle && !trottle && !resetComleted) {
-            resetComleted = true;
-            std::cout << " Primo campione cte = " << cte << std::endl;
+          if(!angle && !trottle && !resetCompleted) {
+            resetCompleted = true;
+            std::cout << " First good value = " << cte << std::endl;
           }
-
-          if(!pid.isTuned() && resetComleted) {
-            trainer.UpdateError(cte);
+          if (resetCompleted)
             samples++;
+
+          if(!pid.isTuned() && resetCompleted) {
+            trainer.UpdateError(cte);
+
             if(samples == how_many * scaling_factor) {
               std::cout << " We got " << samples << " samples " << std::endl;
               trainer.TuneParameters();
+              // if (trainer.GetBestError() <= prev_best_error) {
+              //   std::cout << "\t\t\tWe want more samples " << std::endl;
+              //   scaling_factor = 1.5;
+              //   prev_best_error = trainer.GetBestError();
+              // }
               std::string msg("42[\"reset\", {}]");
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-              resetComleted = false;
+              resetCompleted = false;
               samples = 1;
             }
           }
           if(pid.isTuned()) {
-            std::cout << "we are running with Kp = " << pid.getKp() << "Kd = " <<
-              pid.getKd() << " Ki = " << pid.getKi()<< std::endl;
-          }
-          // else {
-          //   std::cout << "TUNING PHASE: PID current coefficient Kp " << pid.getKp()
-          //   << " Kd " << pid.getKd() << " Ki " << pid.getKi() << " current cte "
-          //   << cte << std::endl;
-          // }
-
-          pid.UpdateError(cte);
-          steer_value = pid.TotalError();
-
-          //speedPid.UpdateError(cte);
-          //throttle_val = speedPid.TotalError();
-          //std::cout << "Steering value = " << steer_value << std::endl;
-
-          if (steer_value > 1) {
-            steer_value = 1;
-          }
-          if (steer_value < -1) {
-            steer_value = -1;
+            std::cout << "we are running with Kp = " << pid.getKp() << " Kd = " <<
+              pid.getKd() << " Ki = " << pid.getKi() << " cte " << cte << std::endl;
           }
 
-          if(resetComleted && samples >= how_many * scaling_factor && fabs(cte) > max_drift) {
-              std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX Start tuning again" << std::endl;
-              pid.setTuned(false);
+          if (resetCompleted) {
+            pid.UpdateError(cte);
+            steer_value = pid.TotalError();
+
+            if (steer_value > 1) {
+              steer_value = 1;
+            }
+            if (steer_value < -1) {
+              steer_value = -1;
+            }
+
+            // if(pid.isTuned() && ((fabs(cte) > max_drift) || speed <= 1))) {
+            //     std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX Start tuning again" << std::endl;
+            //     pid.setTuned(false);
+            //     std::string msg("42[\"reset\", {}]");
+            //     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            // }
+
+            json msgJson;
+            msgJson["steering_angle"] = steer_value;
+            if (speed <= 50) {
+              if(!pid.isTuned())
+                msgJson["throttle"] = 0.75;
+              else
+                msgJson["throttle"] = 0.3;
+            } else {
+              msgJson["throttle"] = -0.1;
+            }
+
+            // We got suck somewhere...:(
+            if ((samples >= (how_many * scaling_factor)) && ((speed <= 0.1) || (fabs(cte) > max_drift))) {
+              std::cout << " XXXXX RESET BECAUSE STUCK speed = " << speed << "max_error = " << fabs(cte) << std::endl;
+              if(pid.isTuned()) {
+                std::cout << "Stuck even if TUNED...no goood " << std::endl;
+                pid.setTuned(false);
+              }
               std::string msg("42[\"reset\", {}]");
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          }
+              resetCompleted = false;
+              samples = 1;
+            }
 
-
-          // DEBUG
-          //std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
-
-          json msgJson;
-          msgJson["steering_angle"] = steer_value;
-          if (speed <= 20) {
-            msgJson["throttle"] = 0.3;
-          } else {
-            msgJson["throttle"] = -0.1;
-          }
-
-          // We got suck somewhere...:(
-          if (resetComleted && samples > (how_many*scaling_factor) && (speed <= 0.1 || fabs(cte) > 1.5)) {
-            std::cout << " XXXXX RESET BECAUSE STUCK" << std::endl;
-            std::string msg("42[\"reset\", {}]");
+            auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+            std::cout << msg << std::endl;
             ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           }
-
-          auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
         // Manual driving
