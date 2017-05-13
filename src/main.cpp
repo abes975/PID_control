@@ -42,10 +42,10 @@ int main()
   PID speedPid;
 
   //pid.Init(0.25,0.0,1.3);
-  pid.Init(0,0,0);
 
+  pid.Init(0,0,0);
   PIDTrainer trainer(&pid, 0.4);
-  pid.setTuned(true);
+  //pid.setTuned(true);
 
   speedPid.Init(0,0,0);
   PIDTrainer speedTrainer(&speedPid, 0.4);
@@ -55,7 +55,7 @@ int main()
     // how many sample we use to tune parameter (how_many * scaling_factor)
     int target_speed = 40;
     int max_drift = 3;
-    int min_samples = 20;
+    int min_samples = 200;
     int how_many = 200;
     static double scaling_factor = 1;
     static int samples = 1;
@@ -78,6 +78,7 @@ int main()
 
           double steer_value;
           double throttle_val;
+          double speed_cte = 0;
           // Even after a reset has been issued some spurious sample (already
           // in the socket buffer might arrive..and we do not like them)
           if(!angle && !trottle && !resetCompleted) {
@@ -86,10 +87,14 @@ int main()
           }
 
           // Run Twiddle
-          if(!pid.isTuned() && resetCompleted) {
-            trainer.UpdateError(cte);
-            samples++;
-
+          if(resetCompleted) {
+            speed_cte = target_speed - speed;
+            if(!pid.isTuned() || !speedPid.isTuned()) {
+              trainer.UpdateError(cte);
+              std::cout << "Ma merda = " << speed_cte << std::endl;
+              speedTrainer.UpdateError(speed_cte);
+              samples++;
+            }
             int total = int(how_many * scaling_factor);
             if(samples == total) {
               // std::cout << " We got " << samples << " samples " << std::endl;
@@ -98,8 +103,12 @@ int main()
               //   std::cout << " We want more samples here " << int(how_many * scaling_factor) << std::endl;
               // }
               trainer.TuneParameters();
-              std::cout << "TUNING PHASE: PID current coefficient Kp " << pid.getKp()
+              std::cout << "TUNING PHASE: STEERING PID current coefficient Kp " << pid.getKp()
                  << " Kd " << pid.getKd() << " Ki " << pid.getKi() << " current cte "
+                 << cte << std::endl;
+              speedTrainer.TuneParameters();
+              std::cout << "TUNING PHASE: SPEED PID current coefficient Kp " << speedPid.getKp()
+                 << " Kd " << speedPid.getKd() << " Ki " << speedPid.getKi() << " current cte "
                  << cte << std::endl;
               std::string msg("42[\"reset\", {}]");
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
@@ -109,40 +118,43 @@ int main()
           }
 
           if(resetCompleted && pid.isTuned()) {
-            std::cout << "we are running with Kp = " << pid.getKp() << " Kd = " <<
+            std::cout << "we are running STEERING PID with Kp = " << pid.getKp() << " Kd = " <<
               pid.getKd() << " Ki = " << pid.getKi()<< std::endl;
-            //samples++;
           }
-          // else {
-          //   std::cout << "TUNING PHASE: PID current coefficient Kp " << pid.getKp()
-          //   << " Kd " << pid.getKd() << " Ki " << pid.getKi() << " current cte "
-          //   << cte << std::endl;
-          // }
+          if(resetCompleted && speedPid.isTuned()) {
+            std::cout << "we are running SPEED PID with Kp = " << speedPid.getKp() << " Kd = " <<
+              speedPid.getKd() << " Ki = " << speedPid.getKi() << std::endl;
+          }
 
           if(resetCompleted) {
             pid.UpdateError(cte);
             steer_value = pid.TotalError();
+            speedPid.UpdateError(speed_cte);
+            throttle_val = -speedPid.TotalError();
 
-
-          //speedPid.UpdateError(cte);
-          //throttle_val = speedPid.TotalError();
-          //std::cout << "Steering value = " << steer_value << std::endl;
             if (steer_value > 1) {
               steer_value = 1;
             }
             if (steer_value < -1) {
               steer_value = -1;
             }
+            if (throttle_val > 1) {
+              throttle_val = 1;
+            }
+            if (throttle_val < -1) {
+              throttle_val = -1;
+            }
+
           }
-          // Do we need to go back to tuning mode?
-          if(resetCompleted && pid.isTuned() && fabs(cte) > 2 * max_drift) {
-              std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX WE DID NOT DO A GOOD JOB: reset = " << resetCompleted <<  " fabs(cte) = " << fabs(cte) << " Start tuning again" << std::endl;
-              pid.setTuned(false);
-              resetCompleted = false;
-              samples = 1;
-              std::string msg("42[\"reset\", {}]");
-              ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          }
+          // // Do we need to go back to tuning mode?
+          // if(resetCompleted && pid.isTuned() && fabs(cte) > 2 * max_drift) {
+          //     std::cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX WE DID NOT DO A GOOD JOB: reset = " << resetCompleted <<  " fabs(cte) = " << fabs(cte) << " Start tuning again" << std::endl;
+          //     pid.setTuned(false);
+          //     resetCompleted = false;
+          //     samples = 1;
+          //     std::string msg("42[\"reset\", {}]");
+          //     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+          // }
 
 
           // DEBUG
@@ -150,11 +162,11 @@ int main()
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          if (speed <= 30) {
-              msgJson["throttle"] = 1.0;
-          } else {
-            msgJson["throttle"] = -0.1;
-          }
+          msgJson["throttle"] = throttle_val;
+
+          auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+          std::cout << msg << std::endl;
+          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
 
           // We got suck somewhere...:(
           //std::cout << "ResetCompleted " << resetCompleted << " samples = " << samples << " min samples " << min_samples
@@ -175,9 +187,9 @@ int main()
             ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           }
 
-          auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+          // auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+          // std::cout << msg << std::endl;
+          // ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
         // Manual driving
