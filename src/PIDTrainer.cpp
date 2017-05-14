@@ -13,11 +13,12 @@ PIDTrainer::PIDTrainer(PID* p, double threshold)
   _samples = 1;
   _param = std::vector<double>(3,0.0);
   _best_param = std::vector<double>(3,0.0);
-  _dp = std::vector<double>(3, 0.5);
+  //_dp = std::vector<double>(3, 0.1);
+  _dp = std::vector<double>(3, 0.2);
   increment_step = std::vector<double>(3,0.0);
-  increment_step[0] = 2;
-  increment_step[1] = 2;
-  increment_step[2] = 2;
+  increment_step[0] = 1.3;
+  increment_step[1] = 1.3;
+  increment_step[2] = 1.3;
   //increment_step = 1.1;
   decrement_step = std::vector<double>(3,0.0);
   decrement_step[0] = 0.5;
@@ -57,7 +58,7 @@ void PIDTrainer::TuneParameters()
 {
   // Get current error (I have to do always)
   double error = CurrentError();
-  std::cout << "TuneParameter Current error = " << error << std::endl;
+  std::cout << "TuneParameter Current error = " << error << " Best error " << _best_error << std::endl;
   double init_sum = 0.0;
 
   double sum = std::accumulate(_dp.begin(), _dp.end(), init_sum);
@@ -89,9 +90,9 @@ void PIDTrainer::TuneParameters()
         //std::cout << "TRAINING INIT " << " i parametri " << _param[0] << " " << _param[1] << " " << _param[2] << std::endl;
         _currState = INCREASE_COEFFICIENT;
     case INCREASE_COEFFICIENT:
-      std::cout << "INCREASE COEFFICIENT next index = " << _next_index << std::endl;
+      std::cout << "INCREASE COEFFICIENT for parama at index = " << _next_index << std::endl;
       _param[_next_index] += _dp[_next_index];
-      //std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
+      std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
       _pid->Init(_param[0], _param[2], _param[1]);
       _currState = EVALUATE_ERROR_AFTER_INCREASE;
       break;
@@ -105,16 +106,16 @@ void PIDTrainer::TuneParameters()
         //std::cout << "\tNext index will be " << _next_index << std::endl;
 
 
-        std::cout << "INCREASE COEFFICIENT 2 next index = " << _next_index << std::endl;
+        std::cout << "INCREASE COEFFICIENT for index = " << _next_index << std::endl;
         _param[_next_index] += _dp[_next_index];
-        //std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
+        std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
         _pid->Init(_param[0], _param[2], _param[1]);
 
         _currState = EVALUATE_ERROR_AFTER_INCREASE;
       } else {
         //std::cout << "\tBest error NOT decreased ";
         _param[_next_index] -= 2 * _dp[_next_index];
-        //std::cout << " PID PARAMETER will be BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
+        std::cout << "PID PARAMETER " << _next_index << " DECREASED AND will be BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
         _pid->Init(_param[0], _param[2], _param[1]);
         _currState = EVALUATE_ERROR_AFTER_DECREASE;
       }
@@ -124,27 +125,20 @@ void PIDTrainer::TuneParameters()
       if(error < _best_error) {
         //std::cout << "\tImprovement after decreasing Best error decreased " <<  error << std::endl;
         _dp[_next_index] *= increment_step[_next_index];
-        if(_dp[_next_index] <= std::numeric_limits<double>::epsilon()) {
-          std::cout << " XXXXXXXXXXXXXXXXX INCREASE _dp[" << _next_index << "] = " << _dp[_next_index] << std::endl;
-          exit(0);
-        }
       } else {
-        //std::cout << "\tBest error NOT decreased " << std::endl;
+        std::cout << "\tBest error NOT decreased " << std::endl;
 		    _param[_next_index] += _dp[_next_index];
-        //std::cout << "\tPID PARAMETER SHOULD BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
+        std::cout << "\tPID PARAMETER " << _next_index << " increased SHOULD BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
 		    _dp[_next_index] *= decrement_step[_next_index];
-        if(_dp[_next_index] <= std::numeric_limits<double>::epsilon()) {
-          std::cout << " XXXXXXXXXXXXXXXXX DECREASE _dp[" << _next_index << "] = " << _dp[_next_index] << std::endl;
-          exit(0);
-        }
+
       }
       _next_index = (_next_index + 1) % 3;
       //std::cout << "\tNext index will be " << _next_index << std::endl;
       // _currState = INCREASE_COEFFICIENT;
 
-      std::cout << "INCREASE COEFFICIENT 3 next index = " << _next_index << std::endl;
+      std::cout << "INCREASE COEFFICIENT  at index = " << _next_index << std::endl;
       _param[_next_index] += _dp[_next_index];
-      //std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
+      std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
       _pid->Init(_param[0], _param[2], _param[1]);
 
       _currState = EVALUATE_ERROR_AFTER_INCREASE;
@@ -155,7 +149,7 @@ void PIDTrainer::TuneParameters()
       //  _param[0] << " kd = " << _param[1] << " Ki = " << _param[2] << std::endl;
       _total_train++;
       _best_param = _param;
-      _dp = std::vector<double>(3, 0.5);
+      _dp = std::vector<double>(3, 0.2);
       _pid->Init(_param[0], _param[2], _param[1]);
       _pid->setTuned(true);
       _currState = TRAINING_INIT;

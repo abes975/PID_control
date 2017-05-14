@@ -33,18 +33,22 @@ void PID::UpdateError(double cte)
     _prev_error = cte;
     _i_error += cte;
     // Anti-windup
-    // double i_term_max = 1.0;
-    // double i_term_min = -1.0;
-    // if ((_Ki * _i_error) > i_term_max)
-    //  _i_error = i_term_max / _Ki;
-    // else if ((_Ki * _i_error) < i_term_min)
-    //  _i_error = i_term_min / _Ki;
+    // double term_max = 1.0;
+    // double term_min = -1.0;
+    // if ((_Ki * _i_error) > term_max) {
+    //   _i_error = 0;
+    //   std::cout << "Antiwindup ..clamped i_error to " << _i_error << std::endl;
+    // }
+    // else if ((_Ki * _i_error) < term_min) {
+    //   _i_error = 0;
+    //   std::cout << "Antiwindup ..clamped i_error to " << _i_error << std::endl;
+    // }
 
 }
 
 double PID::TotalError()
 {
-  double error = -_Kp * _p_error -_Ki * _i_error -_Kd * _d_error;
+  double error = -_Kp * _p_error + -_Ki * _i_error + -_Kd * _d_error;
   return error;
 
 }
