@@ -38,33 +38,23 @@ int main()
   // Annoying stuff...even if the simulator is resetted socket is not flushed
   // So other samples could arrive...and we have to wait to re start tuning
   bool resetCompleted = true;
-  double prev_best_error = FLT_MAX;
-  PID pid;
-  //Kp = 0.5 Kd = 7.75 Ki = 0.000244141 with constant throttle 0.3
-  //pid.Init(0.5,0.000244141, 7.75);
-  //pid.Init(0.25,0.0175781,31.5);
-  // FINISCE IL GIRO MA PROBLEMA DI STERZO
-  //Kp = 4 Kd = 59.0078 Ki = 0.00244141
-  //pid.setTuned(true);
-  //Kp = 0.0453125 Kd = 0.709375 Ki = 0
 
-  pid.Init(0,0,0);
-  //Kp = 0.125 Kd = 0.89375 Ki = 0
-  pid.Init(0.148145,0.00165746,1.23145);
-  //pid.Init(0.153516,0.0102539, 3.11719);
-  //pid.Init(0.073145,0.00165746,1.94395);
+  PID pid;
+  pid.Init(0.148145, 0.00165746, 1.23145);
   pid.setTuned(true);
 
+  // Uncomment this if you want to do tuning of parameters from scratch.
+  // Can take a lot of time...so be patient...multiple trains can occour.
+  //pid.Init(0,0,0);
 
-  //PIDTrainer trainer(&pid, 0.15);
   PIDTrainer trainer(&pid, 0.10);
 
-  h.onMessage([&pid, &trainer,&resetCompleted, &prev_best_error](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
-    // how many sample we use to tune parameter (how_many * scaling_factor)
+  h.onMessage([&pid, &trainer,&resetCompleted](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     double max_drift = 4;
+    // how many sample we use to tune parameter
     int how_many = 600;
+    // Min number of sample before deciding if reset or not....
     int min_samples = how_many / 20;
-    static int scaling_factor = 1;
     static int samples = 1;
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -91,30 +81,30 @@ int main()
             resetCompleted = true;
             std::cout << " First good value = " << cte << std::endl;
           }
-          if (resetCompleted)
-            samples++;
+          // Count how many samples we processed so far....Probabli masuring
+          // time can be done as well.
+          if (!resetCompleted)
+            return;
 
-          if(!pid.isTuned() && resetCompleted) {
+
+          samples++;
+
+          if(!pid.isTuned()) {
             trainer.UpdateError(cte);
 
-            if(samples == how_many * scaling_factor) {
-              std::cout << " We got " << samples << " samples " << std::endl;
+            if(samples == how_many) {
               trainer.TuneParameters();
-              // if (trainer.GetBestError() <= prev_best_error) {
-              //   std::cout << "\t\t\tWe want more samples " << std::endl;
-              //   scaling_factor = 1.5;
-              //   prev_best_error = trainer.GetBestError();
-              // }
               std::string msg("42[\"reset\", {}]");
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
               resetCompleted = false;
               samples = 1;
             }
           }
-          if(pid.isTuned()) {
-            std::cout << "we are running with Kp = " << pid.getKp() << " Kd = " <<
-              pid.getKd() << " Ki = " << pid.getKi() << " cte " << cte << std::endl;
-          }
+
+          // if(pid.isTuned()) {
+          //   std::cout << "we are running with Kp = " << pid.getKp() << " Kd = " <<
+          //     pid.getKd() << " Ki = " << pid.getKi() << " cte " << cte << std::endl;
+          // }
 
           if (resetCompleted) {
             pid.UpdateError(cte);
@@ -141,24 +131,22 @@ int main()
                 msgJson["throttle"] = 0.3;
             }
 
-            // We got suck somewhere...:(
-            //std::cout << " MA come cazz e possibile: samples = " << samples << " speed = " << speed << " cte " << cte << " fabs(cte) " << fabs(cte) << std::endl;
+            // We got stuck somewhere...:(
             if ((samples >= min_samples) && ((speed <= 0.1) || (fabs(cte) > max_drift))) {
-              std::cout << " XXXXX RESET BECAUSE STUCK speed = " << speed << " cte = " << cte << std::endl;
               if(resetCompleted) {
                 if(pid.isTuned()) {
-                  std::cout << "Stuck even if TUNED...no goood " << std::endl;
                   pid.setTuned(false);
+                  std::cout << "Mode switched again to tuning mode...it can take much time..." << std::endl;
                 }
                 // Give a very high penalty as we are out of the road or stuck!!
                 // A for loop is needed in order to update the internal counter
                 // of the trainer!
-                for(int i = samples; i < ( how_many * scaling_factor); i++)
+                for(int i = samples; i < how_many; i++)
                   trainer.UpdateError(cte * 1.2);
                 // Next sample will turn on twiddle iteration
-                samples = how_many * scaling_factor - 1;
+                samples = how_many - 1;
               } else {
-                std::cout << "RESET SPURIO XXXXXXXXXXXXXXXXXXx" << std::endl;
+                // This is very unlikely to happen
                 std::string msg("42[\"reset\", {}]");
                 ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 resetCompleted = false;

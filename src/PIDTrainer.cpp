@@ -13,13 +13,11 @@ PIDTrainer::PIDTrainer(PID* p, double threshold)
   _samples = 1;
   _param = std::vector<double>(3,0.0);
   _best_param = std::vector<double>(3,0.0);
-  //_dp = std::vector<double>(3, 0.1);
   _dp = std::vector<double>(3, 0.2);
   increment_step = std::vector<double>(3,0.0);
   increment_step[0] = 1.3;
   increment_step[1] = 1.3;
   increment_step[2] = 1.3;
-  //increment_step = 1.1;
   decrement_step = std::vector<double>(3,0.0);
   decrement_step[0] = 0.5;
   decrement_step[1] = 0.5;
@@ -27,14 +25,9 @@ PIDTrainer::PIDTrainer(PID* p, double threshold)
   _best_error = -1;
   _total_train = 1;
   _total_error = FLT_MAX;
- _best_error = FLT_MAX;
+  _best_error = FLT_MAX;
 }
 
-
-PIDTrainer::state PIDTrainer::getState() const
-{
-  return _currState;
-}
 
 const std::vector<double>& PIDTrainer::dumpCoefficient() const
 {
@@ -58,17 +51,13 @@ void PIDTrainer::TuneParameters()
 {
   // Get current error (I have to do always)
   double error = CurrentError();
-  std::cout << "TuneParameter Current error = " << error << " Best error " << _best_error << std::endl;
   double init_sum = 0.0;
 
   double sum = std::accumulate(_dp.begin(), _dp.end(), init_sum);
-  std::cout << " Current parameter dp_Kp[0] = " << _dp[0] << " dp1_Kd = " << _dp[1] << " dp2_Ki = "
-    << _dp[2] << " Kp = " << _param[0] << " Kd = " << _param[1] << " Ki = " << _param[2]
-    << " SUM = " << sum << " threshold = " << _threshold << std::endl;
   // check if finished
   if(_currState != TRAINING_INIT && sum < _threshold) {
-    std::cout << "TRAINING COMPLETE sum = " << sum  << " Threshold = " << _threshold <<
-      " Best Param = " << " Kp = " << _param[0] << " Kd = " << _param[1] <<
+    std::cout << "TRAINING COMPLETE " <<" Best Param = " <<
+      " Kp = " << _param[0] << " Kd = " << _param[1] <<
       " Ki = " << _param[2] << std::endl;
     _best_param = _param;
     _currState = TRAINING_COMPLETE;
@@ -76,77 +65,46 @@ void PIDTrainer::TuneParameters()
 
   switch(_currState) {
     case state::TRAINING_INIT:
-        std::cout << "TRAINING INIT" << std::endl;
-        _best_error = error;
-        //std::cout << "\tGet the 1st TIME best error " << _best_error << std::endl;
-        //_dp = std::vector<double>(3, 0.5);
-        //_param = std::vector<double>(3, 0.0);
-        _param[0] = _pid->getKp();
-        _param[1] = _pid->getKd();
-        _param[2] = _pid->getKi();
-        // Kp, Ki, Kd
-        //_pid->Init(_param[0], _param[2], _param[1]);
-        _next_index = 0;
-        //std::cout << "TRAINING INIT " << " i parametri " << _param[0] << " " << _param[1] << " " << _param[2] << std::endl;
-        _currState = INCREASE_COEFFICIENT;
-    case INCREASE_COEFFICIENT:
-      std::cout << "INCREASE COEFFICIENT for parama at index = " << _next_index << std::endl;
+      _best_error = error;
+      _param[0] = _pid->getKp();
+      _param[1] = _pid->getKd();
+      _param[2] = _pid->getKi();
+      _next_index = 0;
       _param[_next_index] += _dp[_next_index];
-      std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
       _pid->Init(_param[0], _param[2], _param[1]);
       _currState = EVALUATE_ERROR_AFTER_INCREASE;
-      break;
+    break;
     case EVALUATE_ERROR_AFTER_INCREASE:
-      std::cout << "EVALUATE ERROR AFTER INCREASE on index = " << _next_index << std::endl;
       if (error < _best_error) {
-        //std::cout << "\tWe had an improvement Best error will be " <<  error  << std::endl;
         _best_error = error;
         _dp[_next_index] *= increment_step[_next_index];
         _next_index = (_next_index + 1) % 3;
-        //std::cout << "\tNext index will be " << _next_index << std::endl;
 
-
-        std::cout << "INCREASE COEFFICIENT for index = " << _next_index << std::endl;
         _param[_next_index] += _dp[_next_index];
-        std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
         _pid->Init(_param[0], _param[2], _param[1]);
 
         _currState = EVALUATE_ERROR_AFTER_INCREASE;
       } else {
-        //std::cout << "\tBest error NOT decreased ";
         _param[_next_index] -= 2 * _dp[_next_index];
-        std::cout << "PID PARAMETER " << _next_index << " DECREASED AND will be BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
         _pid->Init(_param[0], _param[2], _param[1]);
         _currState = EVALUATE_ERROR_AFTER_DECREASE;
       }
-      break;
+    break;
     case EVALUATE_ERROR_AFTER_DECREASE:
-      std::cout << "EVALUATE ERROR AFTER DECREASE on index = " << _next_index << std::endl;
-      if(error < _best_error) {
-        //std::cout << "\tImprovement after decreasing Best error decreased " <<  error << std::endl;
+      if(error < _best_error)
         _dp[_next_index] *= increment_step[_next_index];
-      } else {
-        std::cout << "\tBest error NOT decreased " << std::endl;
+      else {
 		    _param[_next_index] += _dp[_next_index];
-        std::cout << "\tPID PARAMETER " << _next_index << " increased SHOULD BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
 		    _dp[_next_index] *= decrement_step[_next_index];
-
       }
       _next_index = (_next_index + 1) % 3;
-      //std::cout << "\tNext index will be " << _next_index << std::endl;
-      // _currState = INCREASE_COEFFICIENT;
 
-      std::cout << "INCREASE COEFFICIENT  at index = " << _next_index << std::endl;
       _param[_next_index] += _dp[_next_index];
-      std::cout << "\tPID PARAMETER WILL BE Kp = " << _param[0] <<  " kd " << _param[1] << " ki " << _param[2] << std::endl;
       _pid->Init(_param[0], _param[2], _param[1]);
 
       _currState = EVALUATE_ERROR_AFTER_INCREASE;
-
-      break;
+    break;
     case TRAINING_COMPLETE:
-      std::cout << "TRAINING COMPLETE we did it " << _total_train << " Params kp " <<
-      //  _param[0] << " kd = " << _param[1] << " Ki = " << _param[2] << std::endl;
       _total_train++;
       _best_param = _param;
       _dp = std::vector<double>(3, 0.2);

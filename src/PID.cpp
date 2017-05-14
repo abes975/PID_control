@@ -32,18 +32,6 @@ void PID::UpdateError(double cte)
     _d_error = (cte - _prev_error);
     _prev_error = cte;
     _i_error += cte;
-    // Anti-windup
-    // double term_max = 1.0;
-    // double term_min = -1.0;
-    // if ((_Ki * _i_error) > term_max) {
-    //   _i_error = 0;
-    //   std::cout << "Antiwindup ..clamped i_error to " << _i_error << std::endl;
-    // }
-    // else if ((_Ki * _i_error) < term_min) {
-    //   _i_error = 0;
-    //   std::cout << "Antiwindup ..clamped i_error to " << _i_error << std::endl;
-    // }
-
 }
 
 double PID::TotalError()
@@ -71,18 +59,3 @@ void PID::setNewCoefficients(const std::vector<double>& coeff)
   _Ki = coeff.at(1);
   _Kd = coeff.at(2);
 }
-
-// void PID::printErrors() {
-//   std::cout << " p_error = " << _p_error << " d_error = " << _d_error << " i_error = " << _i_error << std::endl;
-// }
-//
-// Term += ki * error;
-// …
-// output = pTerm + iTerm + dTerm;
-// if (output > maxLimit)
-// iTerm -= output – maxLimit;
-// output = maxLimit;
-// else if (output < minLimit)
-// iTerm += minLimit – output;
-// output = minLimit;
-// …
