@@ -3,6 +3,16 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+### Here's the result (video)
+
+In the video you will see the effect of a PID (Proportional Integrative Derivative) controller driving the car around the track.
+The final parameter choice was made all automatically using multiple iteration of twiddle algorithm. My PID parameters start at with Kp = 0, Kd = 0, Ki = 0 and then using twiddle they are set to a point where the car does not goes out of the track always trying to run as fast as it can. In order to check if the car is still on the track I used speed (that should be positive and >= 0.1 and the absolute value of the cross track error (cte) should be inside a certain limit.
+The "training" of the Kp, Kd, Ki parameter takes lot of attempts (and time too) so the you will see on the first two runs on the track how the car improves the part of the track it can rides on. Then the simulator is stopped and previously detected final parameters are put inside the code and then a complete lap is shown with those parameters.
+
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/MpOWngLQzeE/0.jpg)](https://youtu.be/MpOWngLQzeE)
+
+---
+
 ## Dependencies
 
 * cmake >= 3.5
